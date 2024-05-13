@@ -16,48 +16,70 @@ client = Groq(
 with open('ntu-nlp-2024/team_dev.json', encoding='utf-8') as json_file:
     dev_data = json.load(json_file)
 
+with open('ntu-nlp-2024/team_train.json', encoding='utf-8') as json_file:
+    train_data = json.load(json_file)
+    
 table = [[0 for i in range(3)] for j in range(3)]
 random.shuffle(dev_data)
-data = dev_data[132]
+data_none = list(filter(lambda x: x[-1] == 0 , train_data))
+data_support = list(filter(lambda x: x[-1] == 1 , train_data))
+data_attack = list(filter(lambda x: x[-1] == 2 , train_data))
 predicts = []
 golden = []
-# for data in tqdm(dev_data[:50]):
-for data in tqdm(dev_data):
-    chat_completion = client.chat.completions.create(
-    messages=[
-        {
-            "role": "system",
-            "content": "You are an expert in finance, social media and Mandarin. Determine the relationship between the following post and comment about finance. Does the comment support, attack, or do nothing to the post? You need to give the answer in the form \"{answer}\", where {answer} can only be \'support\', \'attack\', or \'none\'. There is no need for explanation.\n\
-            \n\
-            Post: \"早上買入兩張建立持股  現階段的電信股除了威寶和亞太之外  三雄的使用人數都還在上升(吸納了亞太電信數十萬的用戶)  長期來說沒有悲觀的理由\"\n\
-            Comment: \"下殺是帶量的  或許會回測前波低點87.2\"\n\
-            Classification: support\n\
-            \n\
-            Post: \"這兩天美股大跌 友達ADR也是一樣 10/10 友達ADR 收盤價已跌到 美金$3.95 相當於台幣12元不到 不知道 今天的友達是否會反應這個ADR的股價。\"\n\
-            Comment: \"漲停如果還不算漲幅很大,那要怎樣才算漲幅很大?\"\n\
-            Classification: attack\n\
-            \n\
-            Post: \"看看憐發科這波會不會跌破前波低點193.5.\"\n\
-            Comment: \"發哥年底也有十奈米的晶片要上市啊\n 為什麼股價又見到一字頭了。\"\n\
-            Classification: none"
-        },
-        {
-            "role": "user",
-            "content": f"Post: \"{data[1]}\"\n\
-            Comment: \"{data[2]}\"\n\
-            Classification: ",
-        }
-    ],
-    model="llama3-70b-8192",
-    max_tokens=20,
-    )
-
+relationship = ["無關", "支持", "反對"]
+system_prompt = '任務說明：你是一位來自台灣的金融及股票專家，並且熟知網路用語及繁體中文中關於台灣的金融、股票的一些專有名詞。以下是一些關於台灣金融話題的繁體中文貼文和評論。請仔細閱讀每個貼文和相應的評論，然後分類最後一則貼文和相應的評論之間的關係。可能的分類包括："支持"、"反對"、"無關"。請以"關係：{分類}"的形式回答，包括你所判斷的關係分類，你只需要回答你的分類即可。請確保您的回答是基於內容的分析，並且以繁體中文呈現。'
+print(len(data_none))
+print(len(data_support))
+print(len(data_attack))
+print(system_prompt)
+# data_test = random.choice(data_none)
+context_template = '貼文："{post}"。\n\
+評論："{comment}"。\n\
+關係："{relationship}"'
+# context_content = context_template.format(post = data_test[1], comment = data_test[2], relationship = relationship[data_test[3]])
+# print(context_content)
+# exit()
+for data in tqdm(dev_data[:50]):
+# for data in tqdm(dev_data):
+    run = False
+    context_none = random.choices(data_none, k=3)
+    context_support = random.choices(data_support, k=3)
+    context_attack = random.choices(data_attack, k=3)
+    context = context_none + context_support + context_attack
+    context_content = map(lambda x: context_template.format(post = x[1], comment = x[2], relationship = relationship[x[3]]), context)
+    context_content = '\n\n'.join(context_content)
+    # print(context_content)
+    question = f'貼文："{data[1]}"。\n評論："{data[2]}"\n關係：。'
+    # print(f"{context_content}\n\n{question}")
+    while(True):
+        try:
+            chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{system_prompt}"
+                },
+                {
+                    "role": "user",
+                    "content": f"{context_content}\n\n{question}",
+                }
+            ],
+            model="llama3-70b-8192",
+            max_tokens=20,
+            temperature=0.75,
+            top_p=0.9
+            )
+            break
+        except:
+            continue
+    
     answer = chat_completion.choices[0].message.content
-    if 'none' in answer:
+    # print(answer)
+    if '其他' in answer:
         predict = 0
-    elif 'support' in answer:
+    elif '支持' in answer:
         predict = 1
-    elif 'attack' in answer:
+    elif '反對' in answer:
         predict = 2
     else:
         predict = random.randint(0,2)
