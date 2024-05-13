@@ -70,8 +70,11 @@ for data in tqdm(dev_data[:50]):
             top_p=0.9
             )
             break
-        except:
-            continue
+        except KeyboardInterrupt:
+            print("Program stopped.")
+            exit()
+        except Exception:
+            pass
     
     answer = chat_completion.choices[0].message.content
     # print(answer)
