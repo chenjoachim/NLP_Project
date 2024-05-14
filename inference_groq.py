@@ -25,7 +25,7 @@ data_attack = list(filter(lambda x: x[-1] == 2 , train_data))
 predicts = []
 golden = []
 relationship = ["無關", "支持", "反對"]
-system_prompt = '任務說明：你是一位來自台灣的金融及股票專家，並且熟知網路用語及繁體中文中關於台灣的金融、股票的一些專有名詞。以下是一些關於台灣金融話題的繁體中文貼文和評論。請仔細閱讀每個貼文和相應的評論，然後分類最後一則貼文和相應的評論之間的關係。可能的分類包括："支持"、"反對"、"無關"。請以"關係：{分類}"的形式回答，包括你所判斷的關係分類，你只需要回答你的分類即可。請確保您的回答是基於內容的分析，並且以繁體中文呈現。'
+system_prompt = '任務說明：你是一位來自台灣的金融及股票專家，熟知網路用語及繁體中文中關於台灣的金融、股票的一些專有名詞以及網路論壇上的風氣。以下是一些關於台灣金融話題的繁體中文貼文和評論。請仔細閱讀每個貼文和相應的評論，然後分類最後一則貼文和相應的評論之間的關係。可能的分類包括："支持"、"反對"、"無關"。請以"關係：{分類}"的形式回答，包括你所判斷的關係分類。請確保您的回答是基於內容的分析，並且以繁體中文呈現。\n\n分類說明：\n\n- "支持"：回應直接同意原貼文或評論的觀點，並可能提供額外證據或論據來強化原始觀點，或著在原貼文或評論提出的觀點或信息基礎上提供額外的信息、數據或觀點。\n- "反對"：回應直接不同意原貼文或評論的觀點，或者以隱含的批評或支持方式表達，用誇大或通過言下之意來隱含表達不同意見或態度。\n- "無關"：回應與原貼文或評論的主題或核心問題無直接相關性，未對原始討論提供有意義見解或信息，或是回應過於泛談而沒有明確目標。\n\n在這些對話中時常有暗諷或是俗語的情況，所以請謹慎評估對話的真正含義，可能包含了字面之外的意思。\n\n請根據以上分類指南，分析並回答最後一則貼文和相應評論之間的關係。'
 print(len(data_none))
 print(len(data_support))
 print(len(data_attack))
@@ -47,11 +47,11 @@ client_together = Together(
     api_key=together_api_key
 )
 
-for data in tqdm(dev_data):
+for data in tqdm(dev_data[:50]):
     run = False
-    context_none = random.choices(data_none, k=6)
+    context_none = random.choices(data_none, k=5)
     context_support = random.choices(data_support, k=3)
-    context_attack = random.choices(data_attack, k=6)
+    context_attack = random.choices(data_attack, k=4)
     context = context_none + context_support + context_attack
     context_content = map(lambda x: context_template.format(post = x[1], comment = x[2], relationship = relationship[x[3]]), context)
     context_content = '\n\n'.join(context_content)
