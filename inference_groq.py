@@ -1,18 +1,16 @@
 import os
 from dotenv import load_dotenv
 from groq import Groq
+from together import Together
 from tqdm import tqdm
 import json
 import random
-from sklearn.metrics import f1_score
-
+from sklearn.metrics import f1_score, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 load_dotenv()
-api_key = os.getenv("GROQ_API_KEY")
+# groq_api_key = os.getenv("GROQ_API_KEY")
+together_api_key = os.getenv("TOGETHER_API_KEY")
 
-client = Groq(
-    # This is the default and can be omitted
-    api_key=api_key,
-)
 with open('ntu-nlp-2024/team_dev.json', encoding='utf-8') as json_file:
     dev_data = json.load(json_file)
 
@@ -39,12 +37,21 @@ context_template = '貼文："{post}"。\n\
 # context_content = context_template.format(post = data_test[1], comment = data_test[2], relationship = relationship[data_test[3]])
 # print(context_content)
 # exit()
-for data in tqdm(dev_data[:50]):
-# for data in tqdm(dev_data):
+
+# client_groq = Groq(
+#     # This is the default and can be omitted
+#     api_key=groq_api_key,
+# )
+
+client_together = Together(
+    api_key=together_api_key
+)
+
+for data in tqdm(dev_data):
     run = False
-    context_none = random.choices(data_none, k=3)
+    context_none = random.choices(data_none, k=6)
     context_support = random.choices(data_support, k=3)
-    context_attack = random.choices(data_attack, k=3)
+    context_attack = random.choices(data_attack, k=6)
     context = context_none + context_support + context_attack
     context_content = map(lambda x: context_template.format(post = x[1], comment = x[2], relationship = relationship[x[3]]), context)
     context_content = '\n\n'.join(context_content)
@@ -53,21 +60,42 @@ for data in tqdm(dev_data[:50]):
     # print(f"{context_content}\n\n{question}")
     while(True):
         try:
-            chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"{system_prompt}"
-                },
-                {
-                    "role": "user",
-                    "content": f"{context_content}\n\n{question}",
-                }
-            ],
-            model="llama3-70b-8192",
-            max_tokens=20,
-            temperature=0.75,
-            top_p=0.9
+            ## groq
+            
+            # chat_completion = client_groq.chat.completions.create(
+            # messages=[
+            #     {
+            #         "role": "system",
+            #         "content": f"{system_prompt}"
+            #     },
+            #     {
+            #         "role": "user",
+            #         "content": f"{context_content}\n\n{question}",
+            #     }
+            # ],
+            # model="llama3-70b-8192",
+            # max_tokens=20,
+            # temperature=0.75,
+            # top_p=0.9
+            # )
+            
+            ## together
+            
+            chat_completion = client_together.chat.completions.create(
+                model="meta-llama/Llama-3-70b-chat-hf",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"{system_prompt}"
+                    },
+                    {
+                        "role": "user",
+                        "content": f"{context_content}\n\n{question}"
+                    }
+                ],
+                top_p=0.9,
+                temperature=0.75,
+                max_tokens=20,
             )
             break
         except KeyboardInterrupt:
@@ -78,7 +106,7 @@ for data in tqdm(dev_data[:50]):
     
     answer = chat_completion.choices[0].message.content
     # print(answer)
-    if '其他' in answer:
+    if '無關' in answer:
         predict = 0
     elif '支持' in answer:
         predict = 1
@@ -91,4 +119,7 @@ for data in tqdm(dev_data[:50]):
     table[predict][data[-1]] += 1
 
 print("F1_score:", f1_score(golden, predicts, average='weighted'))
-print(table)
+cm = confusion_matrix(y_true=golden, y_pred=predicts)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[0, 1, 2])
+disp.plot()
+plt.show()
